@@ -329,23 +329,66 @@ function converterFotoBase64(foto){
  * O Código.gs precisa ter o doPost com suporte a ?bridge=1 (passo seguinte).
  */
 function enviarParaGoogle(registro){
+
   return new Promise((resolve,reject)=>{
-    const frame=document.createElement("iframe"),form=document.createElement("form"),payload=document.createElement("textarea");
+
+    const frame=document.createElement("iframe");
+    const form=document.createElement("form");
+    const payload=document.createElement("textarea");
+
     const nome="registroViasFrame_"+Date.now()+"_"+Math.random().toString(36).slice(2);
-    frame.name=nome;frame.style.display="none";frame.setAttribute("aria-hidden","true");
-    form.method="POST";form.action=URL_APPS_SCRIPT+"?bridge=1";form.target=nome;form.style.display="none";
-    payload.name="payload";payload.value=JSON.stringify(registro);form.appendChild(payload);
+
+    frame.name=nome;
+    frame.style.display="none";
+    frame.setAttribute("aria-hidden","true");
+
+    form.method="POST";
+    form.action=URL_APPS_SCRIPT+"?bridge=1";
+    form.target=nome;
+    form.style.display="none";
+
+    payload.name="payload";
+    payload.value=JSON.stringify(registro);
+    form.appendChild(payload);
+
     let finalizado=false;
-    const limpar=()=>{window.removeEventListener("message",receber);form.remove();frame.remove();clearTimeout(timer);};
-    const receber=event=>{
-      if(event.source!==frame.contentWindow||!event.data||event.data.type!=="REGISTRO_VIAS_RESULT")return;
-      finalizado=true;limpar();resolve(event.data.payload);
+    let timer;
+
+    const limpar=()=>{
+      window.removeEventListener("message",receber);
+      form.remove();
+      frame.remove();
+      clearTimeout(timer);
     };
+
+    const receber=event=>{
+
+      if(!event.data ||
+         event.data.type!=="REGISTRO_VIAS_RESULT") return;
+
+      finalizado=true;
+      limpar();
+
+      resolve(event.data.payload);
+    };
+
     window.addEventListener("message",receber);
+
     document.body.append(frame,form);
-    const timer=setTimeout(()=>{if(!finalizado){limpar();reject(new Error("Tempo esgotado aguardando resposta do Google Apps Script."));}},90000);
+
+    timer=setTimeout(()=>{
+      if(!finalizado){
+        limpar();
+        reject(new Error(
+          "Tempo esgotado aguardando resposta do Google Apps Script."
+        ));
+      }
+    },90000);
+
     form.submit();
+
   });
+
 }
 
 async function sincronizar(){
