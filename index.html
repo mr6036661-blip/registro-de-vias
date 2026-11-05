@@ -479,17 +479,41 @@ async function sincronizar(){
 $("btnSync").addEventListener("click",sincronizar);
 
 async function inicializar(){
-  atualizarConexao();statusEl.textContent="Abrindo armazenamento offline...";
-  try{
-    await iniciarBanco();statusEl.textContent="Migrando registros anteriores...";
-    await migrarRegistrosAntigos();await atualizarFila();
+
+  atualizarConexao();
+  statusEl.textContent="DIAGNÓSTICO: iniciando aplicativo...";
+
+  try {
+
+    statusEl.textContent="DIAGNÓSTICO: abrindo banco local...";
+    await iniciarBanco();
+
+    statusEl.textContent="DIAGNÓSTICO: banco aberto. Migrando registros...";
+    await migrarRegistrosAntigos();
+
+    statusEl.textContent="DIAGNÓSTICO: atualizando fila...";
+    await atualizarFila();
+
     statusEl.textContent="✅ Aplicativo pronto para uso.";
+
     if(navigator.onLine)setTimeout(sincronizar,2000);
+
     if("serviceWorker" in navigator){
-      navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Service Worker não registrado:",err));
+      navigator.serviceWorker.register("./sw.js").catch(err=>
+        console.warn("Service Worker não registrado:",err)
+      );
     }
-  }catch(err){console.error(err);statusEl.textContent="Erro ao inicializar armazenamento offline.";alert("Não foi possível inicializar o banco local. Recarregue o aplicativo.");}
+
+  } catch(err) {
+
+    console.error("ERRO NA INICIALIZAÇÃO:",err);
+
+    statusEl.textContent=
+      "ERRO: "+(err.message||String(err));
+
+  }
 }
+
 inicializar();
 </script>
 </body>
