@@ -328,39 +328,88 @@ function converterFotoBase64(foto){
  * do Apps Script entre domínios sem depender de CORS do fetch.
  * O Código.gs precisa ter o doPost com suporte a ?bridge=1 (passo seguinte).
  */
-function enviarParaGoogle(registro){
+function enviarParaGoogle(registro) {
+  return new Promise((resolve, reject) => {
 
-  return new Promise((resolve,reject)=>{
+    const codigo = String(registro.id);
+    const inicio = Date.now();
+    const limite = 120000;
 
-    const frame=document.createElement("iframe");
-    const form=document.createElement("form");
-    const payload=document.createElement("textarea");
+    // ENVIAR REGISTRO AO GOOGLE APPS SCRIPT
+    try {
+      fetch(URL_APPS_SCRIPT, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=UTF-8"
+        },
+        body: JSON.stringify(registro)
+      }).catch(erro => {
+        console.log("Aviso no envio:", erro);
+      });
+    } catch (erro) {
+      console.log("Aviso no envio:", erro);
+    }
 
-    const nome="registroViasFrame_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+    // CONSULTAR RESULTADO DA SINCRONIZAÇÃO
+    function consultarStatus() {
 
-    frame.name=nome;
-    frame.style.display="none";
-    frame.setAttribute("aria-hidden","true");
+      if (Date.now() - inicio >= limite) {
+        reject(new Error(
+          "Tempo esgotado aguardando confirmação do Google."
+        ));
+        return;
+      }
 
-    form.method="POST";
-    form.action=URL_APPS_SCRIPT+"?bridge=1";
-    form.target=nome;
-    form.style.display="none";
+      const nomeCallback =
+        "rvCallback_" +
+        Date.now() + "_" +
+        Math.random().toString(36).slice(2);
 
-    payload.name="payload";
-    payload.value=JSON.stringify(registro);
-    form.appendChild(payload);
+      const script = document.createElement("script");
 
-    let finalizado=false;
-    let timer;
+      let finalizado = false;
 
-    const limpar=()=>{
-      window.removeEventListener("message",receber);
-      form.remove();
-      frame.remove();
-      clearTimeout(timer);
-    };
+      function limpar() {
+        script.remove();
+        delete window[nomeCallback];
+      }
 
+      window[nomeCallback] = function(resultado) {
+
+        if (finalizado) return;
+        finalizado = true;
+
+        limpar();
+
+        if (resultado && resultado.pronto === true) {
+          resolve(resultado);
+        } else {
+          setTimeout(consultarStatus, 2000);
+        }
+      };
+
+      script.onerror = function() {
+        if (finalizado) return;
+        finalizado = true;
+        limpar();
+        setTimeout(consultarStatus, 3000);
+      };
+
+      script.src =
+        URL_APPS_SCRIPT +
+        "?status=" + encodeURIComponent(codigo) +
+        "&callback=" + encodeURIComponent(nomeCallback) +
+        "&t=" + Date.now();
+
+      document.body.appendChild(script);
+    }
+
+    // AGUARDAR UM POUCO ANTES DA PRIMEIRA CONSULTA
+    setTimeout(consultarStatus, 1500);
+
+  });
+}
     const receber=event=>{
       console.log("MENSAGEM RECEBIDA:", event.data);
 
