@@ -1,0 +1,18 @@
+{
+  "name": "Registro de Vias",
+  "short_name": "Registro de Vias",
+  "description": "Aplicativo de inspeção e registro de ocorrências nas vias.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f4f8",
+  "theme_color": "#1769aa",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
