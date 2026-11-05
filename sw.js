@@ -1,4 +1,4 @@
-const CACHE_NAME = "registro-vias-v3";
+const CACHE_NAME = "registro-vias-v4";
 
 const ARQUIVOS_CACHE = [
   "./",
