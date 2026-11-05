@@ -76,30 +76,12 @@ hr{border:0;border-top:1px solid #e2e8ef;margin:20px 0}
 <label for="trecho">TRECHO OU REFERÊNCIA DA VIA <span class="required">*</span></label>
 <select id="trecho" required>
 <option value="">Selecione...</option>
-<option>KM 1</option>
-<option>KM 2</option>
-<option>KM 3</option>
-<option>KM 4</option>
-<option>KM 5</option>
-<option>KM 6</option>
-<option>KM 7</option>
-<option>KM 8</option>
-<option>KM 9</option>
-<option>KM 10</option>
-<option>KM 11</option>
-<option>KM 12</option>
-<option>KM 13</option>
-<option>KM 14</option>
-<option>KM 15</option>
-<option>KM 16</option>
-<option>KM 17</option>
-<option>KM 18</option>
-<option>KM 19</option>
-<option>KM 20</option>
-<option>KM 21</option>
-<option>KM 22</option>
-<option>KM 23</option>
-<option>Outro</option>
+<option>KM 1</option><option>KM 2</option><option>KM 3</option><option>KM 4</option>
+<option>KM 5</option><option>KM 6</option><option>KM 7</option><option>KM 8</option>
+<option>KM 9</option><option>KM 10</option><option>KM 11</option><option>KM 12</option>
+<option>KM 13</option><option>KM 14</option><option>KM 15</option><option>KM 16</option>
+<option>KM 17</option><option>KM 18</option><option>KM 19</option><option>KM 20</option>
+<option>KM 21</option><option>KM 22</option><option>KM 23</option><option>Outro</option>
 </select>
 <div id="trechoOutroBox" hidden>
 <label for="trechoOutro">Informe a referência <span class="required">*</span></label>
@@ -137,9 +119,11 @@ hr{border:0;border-top:1px solid #e2e8ef;margin:20px 0}
 
 <script>
 "use strict";
+
 const URL_APPS_SCRIPT="https://script.google.com/macros/s/AKfycbygEp9CPJ3FlngFG7ebKm-8RQYU7ubi6wmenAhTB_U6T1yiRSykNp1Oto4DypAbOcY/exec";
 const DB_NOME="RegistroViasDB", DB_VERSAO=1, STORE_NOME="registros";
 const CHAVE_ANTIGA="registrosVias", MAX_FOTOS=5, MAX_DIMENSAO=1600, QUALIDADE_JPEG=0.72;
+
 let db=null, gps=null, fotosSelecionadas=[], sincronizando=false;
 const statusEl=document.getElementById("status");
 const $=id=>document.getElementById(id);
@@ -152,365 +136,657 @@ $("data").value=hojeLocal();
 
 function iniciarBanco(){
   return new Promise((resolve,reject)=>{
+    if(!("indexedDB" in window)){
+      reject(new Error("Este navegador não disponibiliza armazenamento local."));
+      return;
+    }
+
     const req=indexedDB.open(DB_NOME,DB_VERSAO);
+
     req.onupgradeneeded=e=>{
       const banco=e.target.result;
-      if(!banco.objectStoreNames.contains(STORE_NOME)) banco.createObjectStore(STORE_NOME,{keyPath:"id"});
+      if(!banco.objectStoreNames.contains(STORE_NOME)){
+        banco.createObjectStore(STORE_NOME,{keyPath:"id"});
+      }
     };
-    req.onsuccess=e=>{db=e.target.result;db.onversionchange=()=>db.close();resolve(db);};
-    req.onerror=()=>reject(req.error);
-    req.onblocked=()=>{statusEl.textContent="Armazenamento ocupado por outra aba. Feche outras abas do aplicativo.";};
+
+    req.onsuccess=e=>{
+      db=e.target.result;
+      db.onversionchange=()=>db.close();
+      resolve(db);
+    };
+
+    req.onerror=()=>reject(req.error||new Error("Não foi possível abrir o banco local."));
+    req.onblocked=()=>{
+      statusEl.textContent="Armazenamento ocupado por outra aba. Feche outras abas do aplicativo.";
+    };
   });
 }
+
 function operacaoDB(metodo,registro){
   return new Promise((resolve,reject)=>{
-    const tx=db.transaction(STORE_NOME,"readwrite"), store=tx.objectStore(STORE_NOME);
+    if(!db){
+      reject(new Error("Banco de dados ainda não está aberto."));
+      return;
+    }
+
+    let tx;
+    try{
+      tx=db.transaction(STORE_NOME,"readwrite");
+    }catch(err){
+      reject(err);
+      return;
+    }
+
+    const store=tx.objectStore(STORE_NOME);
     const req=metodo==="getAll"?store.getAll():store[metodo](registro);
+
     req.onsuccess=()=>resolve(req.result);
     req.onerror=()=>reject(req.error);
-    tx.onabort=()=>reject(tx.error);
+    tx.onabort=()=>reject(tx.error||new Error("Operação no banco local foi cancelada."));
   });
 }
+
 const adicionarRegistro=r=>operacaoDB("add",r);
 const buscarRegistros=()=>operacaoDB("getAll");
 const atualizarRegistro=r=>operacaoDB("put",r);
 
 async function migrarRegistrosAntigos(){
   let antigos=[];
-  try{antigos=JSON.parse(localStorage.getItem(CHAVE_ANTIGA)||"[]");}catch(e){console.warn(e);}
-  if(!antigos.length)return;
+  try{
+    antigos=JSON.parse(localStorage.getItem(CHAVE_ANTIGA)||"[]");
+  }catch(e){
+    console.warn("Não foi possível ler registros antigos:",e);
+  }
+
+  if(!Array.isArray(antigos)||!antigos.length)return;
+
   const atuais=await buscarRegistros();
+
   for(const antigo of antigos){
     if(atuais.some(r=>String(r.id)===String(antigo.id)))continue;
+
     let foto=antigo.foto;
+
     if(typeof foto==="string"&&foto.includes(",")){
-      const partes=foto.split(","), mime=partes[0].match(/:(.*?);/), tipo=mime?mime[1]:"image/jpeg";
-      const bytes=atob(partes[1]), array=new Uint8Array(bytes.length);
+      const partes=foto.split(",");
+      const mime=partes[0].match(/:(.*?);/);
+      const tipo=mime?mime[1]:"image/jpeg";
+      const bytes=atob(partes[1]);
+      const array=new Uint8Array(bytes.length);
+
       for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);
       foto=new Blob([array],{type:tipo});
     }
+
     await adicionarRegistro({
-      id:String(antigo.id),latitude:antigo.latitude,longitude:antigo.longitude,
-      precisao:antigo.precisao,data:antigo.data,foto:foto instanceof Blob?foto:null,
-      fotos:foto instanceof Blob?[foto]:[],responsavel:"",problema:"",descricao:"",
-      trecho:"",solucao:"",acao:"",codigo:String(antigo.id),
-      enviado:antigo.enviado===true,tentativas:0
+      id:String(antigo.id),
+      latitude:antigo.latitude,
+      longitude:antigo.longitude,
+      precisao:antigo.precisao,
+      data:antigo.data,
+      foto:foto instanceof Blob?foto:null,
+      fotos:foto instanceof Blob?[foto]:[],
+      responsavel:antigo.responsavel||"",
+      problema:antigo.problema||"",
+      descricao:antigo.descricao||"",
+      trecho:antigo.trecho||"",
+      solucao:antigo.solucao||"",
+      acao:antigo.acao||"",
+      codigo:String(antigo.codigo||antigo.id),
+      enviado:antigo.enviado===true,
+      tentativas:0
     });
   }
+
+  // Só remove a cópia antiga depois de migrar todos os itens sem erro.
   localStorage.removeItem(CHAVE_ANTIGA);
 }
 
 function atualizarConexao(){
   const el=$("conexao");
-  if(navigator.onLine){el.textContent="🟢 INTERNET CONECTADA";el.className="conexao";}
-  else{el.textContent="🟠 SEM INTERNET — MODO OFFLINE ATIVO";el.className="conexao offline";}
+  if(navigator.onLine){
+    el.textContent="🟢 INTERNET CONECTADA";
+    el.className="conexao";
+  }else{
+    el.textContent="🟠 SEM INTERNET — MODO OFFLINE ATIVO";
+    el.className="conexao offline";
+  }
 }
-window.addEventListener("online",()=>{atualizarConexao();statusEl.textContent="Internet restaurada! Verificando registros pendentes...";atualizarFila();setTimeout(sincronizar,2500);});
-window.addEventListener("offline",()=>{atualizarConexao();statusEl.textContent="Sem internet. Você pode continuar registrando normalmente.";});
+
+window.addEventListener("online",()=>{
+  atualizarConexao();
+  statusEl.textContent="Internet restaurada! Verificando registros pendentes...";
+  atualizarFila();
+  setTimeout(sincronizar,2500);
+});
+
+window.addEventListener("offline",()=>{
+  atualizarConexao();
+  statusEl.textContent="Sem internet. Você pode continuar registrando normalmente.";
+});
 
 function capturarGPS(){
   statusEl.textContent="📍 Solicitando localização...";
-  if(!navigator.geolocation){statusEl.textContent="Navegador sem suporte a GPS.";alert("Este navegador não suporta localização.");return;}
+
+  if(!navigator.geolocation){
+    statusEl.textContent="Navegador sem suporte a GPS.";
+    alert("Este navegador não suporta localização.");
+    return;
+  }
+
   navigator.geolocation.getCurrentPosition(pos=>{
-    gps={latitude:pos.coords.latitude,longitude:pos.coords.longitude,precisao:pos.coords.accuracy,data:new Date().toISOString()};
-    $("coordenadas").textContent=`Latitude: ${gps.latitude} | Longitude: ${gps.longitude} | Precisão: ${gps.precisao.toFixed(1)} m`;
+    gps={
+      latitude:pos.coords.latitude,
+      longitude:pos.coords.longitude,
+      precisao:pos.coords.accuracy,
+      data:new Date().toISOString()
+    };
+
+    $("coordenadas").textContent=
+      `Latitude: ${gps.latitude} | Longitude: ${gps.longitude} | Precisão: ${gps.precisao.toFixed(1)} m`;
+
     statusEl.textContent="✅ Localização capturada com sucesso!";
   },erro=>{
-    const msg=erro.code===1?"Permita o acesso à localização nas configurações do navegador.":erro.code===2?"GPS indisponível. Verifique o sinal.":"Tempo esgotado. Tente novamente em local aberto.";
-    statusEl.textContent=msg;alert(msg);
-  },{enableHighAccuracy:true,timeout:20000,maximumAge:60000});
+    const msg=erro.code===1
+      ?"Permita o acesso à localização nas configurações do navegador."
+      :erro.code===2
+      ?"GPS indisponível. Verifique o sinal."
+      :"Tempo esgotado. Tente novamente em local aberto.";
+
+    statusEl.textContent=msg;
+    alert(msg);
+  },{
+    enableHighAccuracy:true,
+    timeout:20000,
+    maximumAge:60000
+  });
 }
 $("btnGps").addEventListener("click",capturarGPS);
 $("btnFoto").addEventListener("click",()=>$("foto").click());
 
 function comprimirImagem(file){
   return new Promise((resolve,reject)=>{
-    if(!file.type.startsWith("image/")){reject(new Error("Arquivo não é uma imagem."));return;}
-    const img=new Image(), url=URL.createObjectURL(file);
+    if(!file.type.startsWith("image/")){
+      reject(new Error("Arquivo não é uma imagem."));
+      return;
+    }
+
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+
     img.onload=()=>{
-      let w=img.width,h=img.height,escala=Math.min(1,MAX_DIMENSAO/Math.max(w,h));
-      w=Math.round(w*escala);h=Math.round(h*escala);
-      const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
-      canvas.getContext("2d").drawImage(img,0,0,w,h);
-      canvas.toBlob(blob=>{URL.revokeObjectURL(url);blob?resolve(blob):reject(new Error("Não foi possível processar a foto."));},"image/jpeg",QUALIDADE_JPEG);
+      let w=img.width,h=img.height;
+      const escala=Math.min(1,MAX_DIMENSAO/Math.max(w,h));
+      w=Math.round(w*escala);
+      h=Math.round(h*escala);
+
+      const canvas=document.createElement("canvas");
+      canvas.width=w;
+      canvas.height=h;
+
+      const contexto=canvas.getContext("2d");
+      if(!contexto){
+        URL.revokeObjectURL(url);
+        reject(new Error("Não foi possível preparar a imagem."));
+        return;
+      }
+
+      contexto.drawImage(img,0,0,w,h);
+
+      canvas.toBlob(blob=>{
+        URL.revokeObjectURL(url);
+        blob?resolve(blob):reject(new Error("Não foi possível processar a foto."));
+      },"image/jpeg",QUALIDADE_JPEG);
     };
-    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Falha ao abrir imagem."));};
+
+    img.onerror=()=>{
+      URL.revokeObjectURL(url);
+      reject(new Error("Falha ao abrir imagem."));
+    };
+
     img.src=url;
   });
 }
+
 $("foto").addEventListener("change",async e=>{
-  const arquivos=Array.from(e.target.files||[]);e.target.value="";
+  const arquivos=Array.from(e.target.files||[]);
+  e.target.value="";
   if(!arquivos.length)return;
+
   const vagas=MAX_FOTOS-fotosSelecionadas.length;
-  if(vagas<=0){alert("Você já selecionou 5 fotos.");return;}
-  if(arquivos.length>vagas)alert(`Só serão adicionadas ${vagas} foto(s), para respeitar o limite de 5.`);
+  if(vagas<=0){
+    alert("Você já selecionou 5 fotos.");
+    return;
+  }
+
+  if(arquivos.length>vagas){
+    alert(`Só serão adicionadas ${vagas} foto(s), para respeitar o limite de 5.`);
+  }
+
   statusEl.textContent="📸 Preparando e compactando fotos...";
+
   try{
-    for(const arquivo of arquivos.slice(0,vagas))fotosSelecionadas.push({blob:await comprimirImagem(arquivo),nome:arquivo.name});
-    renderizarFotos();statusEl.textContent="Fotos adicionadas. Lembre-se de salvar o registro.";
-  }catch(err){console.error(err);alert("Não foi possível processar uma das imagens.");}
+    for(const arquivo of arquivos.slice(0,vagas)){
+      fotosSelecionadas.push({
+        blob:await comprimirImagem(arquivo),
+        nome:arquivo.name
+      });
+    }
+
+    renderizarFotos();
+    statusEl.textContent="Fotos adicionadas. Lembre-se de salvar o registro.";
+  }catch(err){
+    console.error(err);
+    alert("Não foi possível processar uma das imagens.");
+  }
 });
+
 function renderizarFotos(){
-  const preview=$("preview");preview.innerHTML="";
+  const preview=$("preview");
+  preview.innerHTML="";
+
   fotosSelecionadas.forEach((item,index)=>{
-    const url=URL.createObjectURL(item.blob),div=document.createElement("div");div.className="photo-item";
-    const img=document.createElement("img");img.src=url;img.alt=`Foto ${index+1}`;
-    const info=document.createElement("div");info.className="hint";info.textContent=`Foto ${index+1} · ${(item.blob.size/1024).toFixed(0)} KB`;
-    const btn=document.createElement("button");btn.type="button";btn.textContent="Remover foto";
-    btn.onclick=()=>{URL.revokeObjectURL(url);fotosSelecionadas.splice(index,1);renderizarFotos();};
-    div.append(img,info,btn);preview.appendChild(div);
+    const url=URL.createObjectURL(item.blob);
+    const div=document.createElement("div");
+    div.className="photo-item";
+
+    const img=document.createElement("img");
+    img.src=url;
+    img.alt=`Foto ${index+1}`;
+
+    const info=document.createElement("div");
+    info.className="hint";
+    info.textContent=`Foto ${index+1} · ${(item.blob.size/1024).toFixed(0)} KB`;
+
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.textContent="Remover foto";
+
+    btn.onclick=()=>{
+      URL.revokeObjectURL(url);
+      fotosSelecionadas.splice(index,1);
+      renderizarFotos();
+    };
+
+    div.append(img,info,btn);
+    preview.appendChild(div);
   });
-  $("contadorFotos").textContent=`${fotosSelecionadas.length} de ${MAX_FOTOS} fotos selecionadas`;
+
+  $("contadorFotos").textContent=
+    `${fotosSelecionadas.length} de ${MAX_FOTOS} fotos selecionadas`;
 }
+
 $("problema").addEventListener("change",()=>{
-  const vis=$("problema").value==="Outro";$("problemaOutroBox").hidden=!vis;$("problemaOutro").required=vis;
+  const vis=$("problema").value==="Outro";
+  $("problemaOutroBox").hidden=!vis;
+  $("problemaOutro").required=vis;
 });
+
 $("trecho").addEventListener("change",()=>{
-  const vis=$("trecho").value==="Outro";$("trechoOutroBox").hidden=!vis;$("trechoOutro").required=vis;
+  const vis=$("trecho").value==="Outro";
+  $("trechoOutroBox").hidden=!vis;
+  $("trechoOutro").required=vis;
 });
-document.querySelectorAll('input[name="solucao"]').forEach(r=>r.addEventListener("change",()=>{
-  const nao=document.querySelector('input[name="solucao"]:checked')?.value==="NÃO";
-  $("acaoBox").hidden=!nao;$("acao").required=nao;
-}));
+
+document.querySelectorAll('input[name="solucao"]').forEach(r=>{
+  r.addEventListener("change",()=>{
+    const nao=document.querySelector('input[name="solucao"]:checked')?.value==="NÃO";
+    $("acaoBox").hidden=!nao;
+    $("acao").required=nao;
+  });
+});
+
 function gerarCodigo(){
-  const d=new Date(),pad=n=>String(n).padStart(2,"0");
-  return "VIA-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
+  const d=new Date();
+  const pad=n=>String(n).padStart(2,"0");
+
+  return "VIA-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"-"+
+    pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+"-"+
+    Math.random().toString(36).slice(2,7).toUpperCase();
 }
-function obterProblema(){const v=$("problema").value;return v==="Outro"?`Outro: ${$("problemaOutro").value.trim()}`:v;}
-function obterTrecho(){const v=$("trecho").value;return v==="Outro"?`Outro: ${$("trechoOutro").value.trim()}`:v;}
+
+function obterProblema(){
+  const v=$("problema").value;
+  return v==="Outro"?`Outro: ${$("problemaOutro").value.trim()}`:v;
+}
+
+function obterTrecho(){
+  const v=$("trecho").value;
+  return v==="Outro"?`Outro: ${$("trechoOutro").value.trim()}`:v;
+}
 
 $("formRegistro").addEventListener("submit",async e=>{
   e.preventDefault();
-  if(!db){alert("Aguarde a inicialização do aplicativo.");return;}
-  if(!gps){alert("Capture a localização GPS antes de salvar.");return;}
-  if(!fotosSelecionadas.length){alert("Adicione pelo menos uma foto do local.");return;}
+
+  if(!db){
+    alert("Aguarde a inicialização do aplicativo.");
+    return;
+  }
+
+  if(!gps){
+    alert("Capture a localização GPS antes de salvar.");
+    return;
+  }
+
+  if(!fotosSelecionadas.length){
+    alert("Adicione pelo menos uma foto do local.");
+    return;
+  }
+
   const solucao=document.querySelector('input[name="solucao"]:checked')?.value||"";
-  if(!solucao){alert("Informe se o problema foi solucionado.");return;}
-  if(solucao==="NÃO"&&!$("acao").value.trim()){alert("Informe a ação necessária para solucionar o problema.");return;}
-  const btn=$("btnSalvar");btn.disabled=true;statusEl.textContent="💾 Salvando registro no celular...";
+
+  if(!solucao){
+    alert("Informe se o problema foi solucionado.");
+    return;
+  }
+
+  if(solucao==="NÃO"&&!$("acao").value.trim()){
+    alert("Informe a ação necessária para solucionar o problema.");
+    return;
+  }
+
+  const btn=$("btnSalvar");
+  btn.disabled=true;
+  statusEl.textContent="💾 Salvando registro no celular...";
+
   try{
-    const codigo=gerarCodigo(),registro={
-      id:crypto.randomUUID(),codigo,responsavel:$("responsavel").value.trim(),data:$("data").value,
-      problema:obterProblema(),descricao:$("descricao").value.trim(),trecho:obterTrecho(),
-      latitude:gps.latitude,longitude:gps.longitude,precisao:gps.precisao,gpsData:gps.data,
-      fotos:fotosSelecionadas.map(f=>f.blob),foto:fotosSelecionadas[0]?.blob||null,
-      solucao,acao:solucao==="NÃO"?$("acao").value.trim():"",
-      enviado:false,tentativas:0,criadoEm:new Date().toISOString()
+    const codigo=gerarCodigo();
+
+    const registro={
+      id:crypto.randomUUID(),
+      codigo,
+      responsavel:$("responsavel").value.trim(),
+      data:$("data").value,
+      problema:obterProblema(),
+      descricao:$("descricao").value.trim(),
+      trecho:obterTrecho(),
+      latitude:gps.latitude,
+      longitude:gps.longitude,
+      precisao:gps.precisao,
+      gpsData:gps.data,
+      fotos:fotosSelecionadas.map(f=>f.blob),
+      foto:fotosSelecionadas[0]?.blob||null,
+      solucao,
+      acao:solucao==="NÃO"?$("acao").value.trim():"",
+      enviado:false,
+      tentativas:0,
+      criadoEm:new Date().toISOString()
     };
+
     await adicionarRegistro(registro);
+
     statusEl.textContent=`✅ Registro salvo no aparelho! Código: ${codigo}`;
-    $("formRegistro").reset();$("data").value=hojeLocal();
-    $("problemaOutroBox").hidden=true;$("trechoOutroBox").hidden=true;$("acaoBox").hidden=true;
-    $("problemaOutro").required=false;$("trechoOutro").required=false;$("acao").required=false;
-    gps=null;fotosSelecionadas=[];$("coordenadas").textContent="Localização ainda não capturada.";renderizarFotos();
-    await atualizarFila();if(navigator.onLine)setTimeout(sincronizar,1200);
-  }catch(err){console.error(err);statusEl.textContent="❌ Erro ao salvar. Verifique o espaço disponível.";alert("Não foi possível salvar o registro no aparelho.");}
-  finally{btn.disabled=false;}
+
+    $("formRegistro").reset();
+    $("data").value=hojeLocal();
+
+    $("problemaOutroBox").hidden=true;
+    $("trechoOutroBox").hidden=true;
+    $("acaoBox").hidden=true;
+    $("problemaOutro").required=false;
+    $("trechoOutro").required=false;
+    $("acao").required=false;
+
+    gps=null;
+    fotosSelecionadas=[];
+    $("coordenadas").textContent="Localização ainda não capturada.";
+    renderizarFotos();
+
+    await atualizarFila();
+
+    if(navigator.onLine)setTimeout(sincronizar,1200);
+
+  }catch(err){
+    console.error(err);
+    statusEl.textContent="❌ Erro ao salvar. Verifique o espaço disponível.";
+    alert("Não foi possível salvar o registro no aparelho.");
+  }finally{
+    btn.disabled=false;
+  }
 });
 
 async function atualizarFila(){
   if(!db)return;
+
   try{
-    const registros=await buscarRegistros(),pendentes=registros.filter(r=>!r.enviado).length,enviados=registros.filter(r=>r.enviado).length;
-    const el=$("fila");el.textContent=`📦 Total: ${registros.length} | ⏳ Pendentes: ${pendentes} | ✅ Enviados: ${enviados}`;
+    const registros=await buscarRegistros();
+    const pendentes=registros.filter(r=>!r.enviado).length;
+    const enviados=registros.filter(r=>r.enviado).length;
+
+    const el=$("fila");
+    el.textContent=`📦 Total: ${registros.length} | ⏳ Pendentes: ${pendentes} | ✅ Enviados: ${enviados}`;
     el.className=pendentes>0?"status pendentes":"status sucesso";
-  }catch(err){console.error("Erro ao consultar fila:",err);}
+  }catch(err){
+    console.error("Erro ao consultar fila:",err);
+  }
 }
+
 function converterFotoBase64(foto){
   return new Promise((resolve,reject)=>{
-    if(typeof foto==="string"){resolve(foto.includes(",")?foto.split(",")[1]:foto);return;}
-    const leitor=new FileReader();leitor.onload=()=>resolve(String(leitor.result).split(",")[1]);leitor.onerror=()=>reject(leitor.error);leitor.readAsDataURL(foto);
+    if(typeof foto==="string"){
+      resolve(foto.includes(",")?foto.split(",")[1]:foto);
+      return;
+    }
+
+    const leitor=new FileReader();
+    leitor.onload=()=>resolve(String(leitor.result).split(",")[1]);
+    leitor.onerror=()=>reject(leitor.error);
+    leitor.readAsDataURL(foto);
   });
 }
 
 /*
- * Envio por formulário oculto + iframe. Essa técnica permite receber a resposta
- * do Apps Script entre domínios sem depender de CORS do fetch.
- * O Código.gs precisa ter o doPost com suporte a ?bridge=1 (passo seguinte).
+ * Envio pelo POST no-cors e consulta JSONP do resultado.
+ * O Apps Script deve guardar o resultado em CacheService
+ * usando o mesmo ID recebido no POST.
  */
-function enviarParaGoogle(registro) {
-  return new Promise((resolve, reject) => {
+function enviarParaGoogle(registro){
+  return new Promise((resolve,reject)=>{
+    const codigo=String(registro.id);
+    const inicio=Date.now();
+    const limite=120000;
+    let resolvido=false;
 
-    const codigo = String(registro.id);
-    const inicio = Date.now();
-    const limite = 120000;
+    // Envia uma única vez. O resultado é consultado separadamente por JSONP.
+    fetch(URL_APPS_SCRIPT,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{
+        "Content-Type":"text/plain;charset=UTF-8"
+      },
+      body:JSON.stringify(registro)
+    }).catch(erro=>{
+      console.log("Aviso no envio:",erro);
+    });
 
-    // ENVIAR REGISTRO AO GOOGLE APPS SCRIPT
-    try {
-      fetch(URL_APPS_SCRIPT, {
-        method: "POST",
-        mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=UTF-8"
-        },
-        body: JSON.stringify(registro)
-      }).catch(erro => {
-        console.log("Aviso no envio:", erro);
-      });
-    } catch (erro) {
-      console.log("Aviso no envio:", erro);
-    }
+    function consultarStatus(){
+      if(resolvido)return;
 
-    // CONSULTAR RESULTADO DA SINCRONIZAÇÃO
-    function consultarStatus() {
-
-      if (Date.now() - inicio >= limite) {
-        reject(new Error(
-          "Tempo esgotado aguardando confirmação do Google."
-        ));
+      if(Date.now()-inicio>=limite){
+        resolvido=true;
+        reject(new Error("Tempo esgotado aguardando confirmação do Google."));
         return;
       }
 
-      const nomeCallback =
-        "rvCallback_" +
-        Date.now() + "_" +
-        Math.random().toString(36).slice(2);
+      const nomeCallback="rvCallback_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+      const script=document.createElement("script");
+      let finalizado=false;
 
-      const script = document.createElement("script");
-
-      let finalizado = false;
-
-      function limpar() {
+      function limpar(){
         script.remove();
-        delete window[nomeCallback];
+        try{
+          delete window[nomeCallback];
+        }catch(e){
+          window[nomeCallback]=undefined;
+        }
       }
 
-      window[nomeCallback] = function(resultado) {
-
-        if (finalizado) return;
-        finalizado = true;
-
+      window[nomeCallback]=function(resultado){
+        if(finalizado||resolvido)return;
+        finalizado=true;
         limpar();
 
-        if (resultado && resultado.pronto === true) {
+        if(resultado&&resultado.pronto===true){
+          resolvido=true;
           resolve(resultado);
-        } else {
-          setTimeout(consultarStatus, 2000);
+        }else{
+          setTimeout(consultarStatus,2000);
         }
       };
 
-      script.onerror = function() {
-        if (finalizado) return;
-        finalizado = true;
+      script.onerror=function(){
+        if(finalizado||resolvido)return;
+        finalizado=true;
         limpar();
-        setTimeout(consultarStatus, 3000);
+        setTimeout(consultarStatus,3000);
       };
 
-      script.src =
-        URL_APPS_SCRIPT +
-        "?status=" + encodeURIComponent(codigo) +
-        "&callback=" + encodeURIComponent(nomeCallback) +
-        "&t=" + Date.now();
+      script.src=URL_APPS_SCRIPT+
+        "?status="+encodeURIComponent(codigo)+
+        "&callback="+encodeURIComponent(nomeCallback)+
+        "&t="+Date.now();
 
       document.body.appendChild(script);
     }
 
-    // AGUARDAR UM POUCO ANTES DA PRIMEIRA CONSULTA
-    setTimeout(consultarStatus, 1500);
-
+    setTimeout(consultarStatus,1500);
   });
-}
-    const receber=event=>{
-      console.log("MENSAGEM RECEBIDA:", event.data);
-
-      if(!event.data ||
-         event.data.type!=="REGISTRO_VIAS_RESULT") return;
-
-      finalizado=true;
-      limpar();
-
-      resolve(event.data.payload);
-    };
-
-    window.addEventListener("message",receber);
-
-    document.body.append(frame,form);
-
-    timer=setTimeout(()=>{
-      if(!finalizado){
-        limpar();
-        reject(new Error(
-          "Tempo esgotado aguardando resposta do Google Apps Script."
-        ));
-      }
-    },90000);
-
-    form.submit();
-
-  });
-
 }
 
 async function sincronizar(){
   if(sincronizando)return;
-  if(!navigator.onLine){statusEl.textContent="Sem internet. Os registros continuam salvos no aparelho.";return;}
-  if(!db){statusEl.textContent="Banco de dados ainda não está pronto.";return;}
-  sincronizando=true;const botao=$("btnSync");botao.disabled=true;
+
+  if(!navigator.onLine){
+    statusEl.textContent="Sem internet. Os registros continuam salvos no aparelho.";
+    return;
+  }
+
+  if(!db){
+    statusEl.textContent="Banco de dados ainda não está pronto.";
+    return;
+  }
+
+  sincronizando=true;
+  const botao=$("btnSync");
+  botao.disabled=true;
+
   try{
-    const registros=await buscarRegistros(),pendentes=registros.filter(r=>!r.enviado);
-    if(!pendentes.length){statusEl.textContent="Todos os registros estão sincronizados.";return;}
+    const registros=await buscarRegistros();
+    const pendentes=registros.filter(r=>!r.enviado);
+
+    if(!pendentes.length){
+      statusEl.textContent="Todos os registros estão sincronizados.";
+      return;
+    }
+
     let enviados=0,falhas=0;
+
     for(let i=0;i<pendentes.length;i++){
-      if(!navigator.onLine){falhas+=pendentes.length-i;break;}
-      const registro=pendentes[i];statusEl.textContent=`🌐 Enviando registro ${i+1} de ${pendentes.length}...`;
+      if(!navigator.onLine){
+        falhas+=pendentes.length-i;
+        break;
+      }
+
+      const registro=pendentes[i];
+      statusEl.textContent=`🌐 Enviando registro ${i+1} de ${pendentes.length}...`;
+
       try{
-        let fotos=Array.isArray(registro.fotos)&&registro.fotos.length?registro.fotos:(registro.foto?[registro.foto]:[]);
-        const fotosBase64=[];for(const foto of fotos)fotosBase64.push(await converterFotoBase64(foto));
+        const fotos=Array.isArray(registro.fotos)&&registro.fotos.length
+          ?registro.fotos
+          :(registro.foto?[registro.foto]:[]);
+
+        const fotosBase64=[];
+        for(const foto of fotos){
+          fotosBase64.push(await converterFotoBase64(foto));
+        }
+
         const dadosEnvio={
-          id:registro.id,codigo:registro.codigo||registro.id,responsavel:registro.responsavel||"",
-          data:registro.data||"",problema:registro.problema||"",descricao:registro.descricao||"",
-          trecho:registro.trecho||"",latitude:registro.latitude,longitude:registro.longitude,
-          precisao:registro.precisao,fotos:fotosBase64,foto:fotosBase64[0]||"",
-          solucao:registro.solucao||"",acao:registro.acao||""
+          id:registro.id,
+          codigo:registro.codigo||registro.id,
+          responsavel:registro.responsavel||"",
+          data:registro.data||"",
+          problema:registro.problema||"",
+          descricao:registro.descricao||"",
+          trecho:registro.trecho||"",
+          latitude:registro.latitude,
+          longitude:registro.longitude,
+          precisao:registro.precisao,
+          fotos:fotosBase64,
+          foto:fotosBase64[0]||"",
+          solucao:registro.solucao||"",
+          acao:registro.acao||""
         };
+
         const resposta=await enviarParaGoogle(dadosEnvio);
+
         if(resposta&&resposta.sucesso){
-          registro.enviado=true;registro.dataEnvio=new Date().toISOString();await atualizarRegistro(registro);enviados++;
-        }else{falhas++;console.error("Resposta do servidor:",resposta);}
-      }catch(err){console.error("Falha no registro "+registro.id,err);falhas++;}
+          registro.enviado=true;
+          registro.dataEnvio=new Date().toISOString();
+          await atualizarRegistro(registro);
+          enviados++;
+        }else{
+          falhas++;
+          console.error("Resposta do servidor:",resposta);
+        }
+      }catch(err){
+        console.error("Falha no registro "+registro.id,err);
+        falhas++;
+      }
+
       await atualizarFila();
     }
-    statusEl.textContent=`🏁 Sincronização finalizada! Enviados: ${enviados} | Pendentes: ${falhas}`;
-    if(falhas===0)alert("✅ Todos os registros foram sincronizados!");
-    else alert(`Sincronização concluída.\n\nEnviados: ${enviados}\nPendentes: ${falhas}\n\nOs registros continuam salvos no aparelho.`);
-  }catch(err){console.error(err);statusEl.textContent="Erro durante a sincronização.";}
-  finally{sincronizando=false;botao.disabled=false;await atualizarFila();}
+
+    statusEl.textContent=
+      `🏁 Sincronização finalizada! Enviados: ${enviados} | Pendentes: ${falhas}`;
+
+    if(falhas===0){
+      alert("✅ Todos os registros foram sincronizados!");
+    }else{
+      alert(
+        `Sincronização concluída.\n\nEnviados: ${enviados}\nPendentes: ${falhas}\n\nOs registros continuam salvos no aparelho.`
+      );
+    }
+
+  }catch(err){
+    console.error(err);
+    statusEl.textContent="Erro durante a sincronização.";
+  }finally{
+    sincronizando=false;
+    botao.disabled=false;
+    await atualizarFila();
+  }
 }
+
 $("btnSync").addEventListener("click",sincronizar);
 
 async function inicializar(){
-
   atualizarConexao();
-  statusEl.textContent="DIAGNÓSTICO: iniciando aplicativo...";
+  statusEl.textContent="Abrindo armazenamento offline...";
 
-  try {
-
-    statusEl.textContent="DIAGNÓSTICO: abrindo banco local...";
+  try{
     await iniciarBanco();
+    statusEl.textContent="Migrando registros anteriores...";
 
-    statusEl.textContent="DIAGNÓSTICO: banco aberto. Migrando registros...";
     await migrarRegistrosAntigos();
-
-    statusEl.textContent="DIAGNÓSTICO: atualizando fila...";
     await atualizarFila();
 
     statusEl.textContent="✅ Aplicativo pronto para uso.";
 
-    if(navigator.onLine)setTimeout(sincronizar,2000);
-
-    if("serviceWorker" in navigator){
-      navigator.serviceWorker.register("./sw.js").catch(err=>
-        console.warn("Service Worker não registrado:",err)
-      );
+    if(navigator.onLine){
+      setTimeout(sincronizar,2000);
     }
 
-  } catch(err) {
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("./sw.js").catch(err=>{
+        console.warn("Service Worker não registrado:",err);
+      });
+    }
 
+  }catch(err){
     console.error("ERRO NA INICIALIZAÇÃO:",err);
-
-    statusEl.textContent=
-      "ERRO: "+(err.message||String(err));
-
+    statusEl.textContent="Erro ao inicializar armazenamento offline: "+(err.message||String(err));
+    alert("Não foi possível inicializar o armazenamento local. Seus registros não foram apagados. Verifique a conexão e tente novamente.");
   }
 }
 
