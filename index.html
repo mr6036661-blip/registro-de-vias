@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1769aa">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Registro de Vias">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="https://drive.google.com/uc?export=download&id=1jFQDN7WdvbjgSMJWEnjokDjBX8xSyHnK">
+<title>Registro de Vias</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f1f4f8;margin:0;padding:14px;color:#1b365d}
+.container{max-width:600px;margin:auto;background:#fff;padding:20px;border-radius:14px;box-shadow:0 2px 10px #0001}
+h2{text-align:center;margin-top:4px}
+p.intro{text-align:center;color:#52657c}
+button{width:100%;padding:14px;margin-top:12px;border:0;border-radius:8px;font-size:16px;color:white;background:#1769aa;cursor:pointer}
+button:disabled{background:#91a5ba;cursor:wait}
+button.secondary{background:#52657c}
+button.danger{background:#b83232}
+label{display:block;font-weight:bold;margin:16px 0 7px}
+input[type=text],input[type=date],select,textarea{width:100%;padding:12px;border:1px solid #bdc9d6;border-radius:8px;font-size:16px;background:white;color:#1b365d}
+textarea{min-height:105px;resize:vertical}
+.required{color:#c62828}
+.hint{font-size:13px;color:#65758a;margin:5px 0}
+.conexao{font-weight:bold;padding:12px;border-radius:8px;text-align:center;background:#e8f5e9;color:#237a35;margin:12px 0}
+.offline{background:#fff3e0;color:#a45b00}
+.status{margin-top:12px;padding:12px;background:#eef5ff;border-radius:8px;overflow-wrap:anywhere}
+.pendentes{background:#fff8e1;color:#795600}
+.sucesso{background:#e8f5e9;color:#237a35}
+.erro{background:#ffebee;color:#b71c1c}
+#foto{display:none}
+.gpsbox{padding:10px;background:#f5f8fb;border-radius:8px;font-size:14px;overflow-wrap:anywhere}
+.photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.photo-item{border:1px solid #d5dee8;border-radius:8px;padding:6px}
+.photo-item img{width:100%;height:130px;object-fit:cover;border-radius:5px}
+.photo-item button{padding:8px;margin-top:5px;font-size:13px;background:#b83232}
+.radio-row{display:flex;gap:18px;align-items:center;margin-top:8px}
+.radio-row label{display:flex;align-items:center;gap:8px;margin:0;font-weight:normal}
+small{display:block;margin-top:12px;text-align:center;color:#65758a}
+hr{border:0;border-top:1px solid #e2e8ef;margin:20px 0}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>📍 REGISTRO DE VIAS</h2>
+<p class="intro">Inspeção e levantamento de campo</p>
+<div id="conexao" class="conexao">🔄 Verificando conexão...</div>
+<div id="status" class="status">Inicializando aplicativo...</div>
+
+<form id="formRegistro">
+<label for="responsavel">NOME DO RESPONSÁVEL PELO PREENCHIMENTO <span class="required">*</span></label>
+<input id="responsavel" type="text" autocomplete="name" required>
+
+<label for="data">DATA <span class="required">*</span></label>
+<input id="data" type="date" required>
+
+<label for="problema">PROBLEMA ENCONTRADO <span class="required">*</span></label>
+<select id="problema" required>
+<option value="">Selecione...</option>
+<option>Buraco ou defeito no pavimento</option><option>Patrolamento</option><option>Drenagem</option>
+<option>Base exposta</option><option>Acostamento</option><option>Sinalização</option>
+<option>Vegetação</option><option>Poeira</option><option>Outro</option>
+</select>
+<div id="problemaOutroBox" hidden>
+<label for="problemaOutro">Descreva o problema <span class="required">*</span></label>
+<input id="problemaOutro" type="text">
+</div>
+
+<label for="descricao">DESCRIÇÃO DO PROBLEMA <span class="required">*</span></label>
+<textarea id="descricao" required placeholder="Descreva o defeito encontrado, o risco e referências que ajudem a localizar o problema."></textarea>
+
+<label for="trecho">TRECHO OU REFERÊNCIA DA VIA <span class="required">*</span></label>
+<select id="trecho" required>
+<option value="">Selecione...</option>
+<option>KM 1</option>
+<option>KM 2</option>
+<option>KM 3</option>
+<option>KM 4</option>
+<option>KM 5</option>
+<option>KM 6</option>
+<option>KM 7</option>
+<option>KM 8</option>
+<option>KM 9</option>
+<option>KM 10</option>
+<option>KM 11</option>
+<option>KM 12</option>
+<option>KM 13</option>
+<option>KM 14</option>
+<option>KM 15</option>
+<option>KM 16</option>
+<option>KM 17</option>
+<option>KM 18</option>
+<option>KM 19</option>
+<option>KM 20</option>
+<option>KM 21</option>
+<option>KM 22</option>
+<option>KM 23</option>
+<option>Outro</option>
+</select>
+<div id="trechoOutroBox" hidden>
+<label for="trechoOutro">Informe a referência <span class="required">*</span></label>
+<input id="trechoOutro" type="text" placeholder="Ex.: próximo à ponte, acesso...">
+</div>
+
+<label>LOCALIZAÇÃO GPS <span class="required">*</span></label>
+<button type="button" id="btnGps">📍 CAPTURAR LOCALIZAÇÃO</button>
+<div id="coordenadas" class="gpsbox">Localização ainda não capturada.</div>
+
+<label>FOTO DO LOCAL <span class="required">*</span> (até 5 fotos)</label>
+<p class="hint">As imagens são reduzidas para economizar espaço e facilitar a sincronização. Você pode adicionar fotos em várias seleções.</p>
+<button type="button" id="btnFoto">📸 TIRAR / SELECIONAR FOTO</button>
+<input id="foto" type="file" accept="image/*" capture="environment" multiple>
+<div id="contadorFotos" class="hint">0 de 5 fotos selecionadas</div>
+<div id="preview" class="photo-grid"></div>
+
+<label>SOLUÇÃO DO PROBLEMA <span class="required">*</span></label>
+<div class="radio-row">
+<label><input type="radio" name="solucao" value="SIM" required> SIM</label>
+<label><input type="radio" name="solucao" value="NÃO" required> NÃO</label>
+</div>
+<div id="acaoBox" hidden>
+<label for="acao">Se não foi solucionado, informe a ação necessária <span class="required">*</span></label>
+<textarea id="acao" placeholder="Descreva o que precisa ser feito para solucionar o problema."></textarea>
+</div>
+<hr>
+<button type="submit" id="btnSalvar">💾 SALVAR REGISTRO NO CELULAR</button>
+</form>
+
+<button type="button" id="btnSync">🌐 SINCRONIZAR REGISTROS</button>
+<div class="status pendentes" id="fila">📦 Carregando registros...</div>
+<small>Os registros podem ser armazenados sem internet. Quando a conexão retornar, a sincronização será iniciada automaticamente.</small>
+</div>
+
+<script>
+"use strict";
+const URL_APPS_SCRIPT="https://script.google.com/macros/s/AKfycbygEp9CPJ3FlngFG7ebKm-8RQYU7ubi6wmenAhTB_U6T1yiRSykNp1Oto4DypAbOcY/exec";
+const DB_NOME="RegistroViasDB", DB_VERSAO=1, STORE_NOME="registros";
+const CHAVE_ANTIGA="registrosVias", MAX_FOTOS=5, MAX_DIMENSAO=1600, QUALIDADE_JPEG=0.72;
+let db=null, gps=null, fotosSelecionadas=[], sincronizando=false;
+const statusEl=document.getElementById("status");
+const $=id=>document.getElementById(id);
+
+function hojeLocal(){
+  const d=new Date(), local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,10);
+}
+$("data").value=hojeLocal();
+
+function iniciarBanco(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NOME,DB_VERSAO);
+    req.onupgradeneeded=e=>{
+      const banco=e.target.result;
+      if(!banco.objectStoreNames.contains(STORE_NOME)) banco.createObjectStore(STORE_NOME,{keyPath:"id"});
+    };
+    req.onsuccess=e=>{db=e.target.result;db.onversionchange=()=>db.close();resolve(db);};
+    req.onerror=()=>reject(req.error);
+    req.onblocked=()=>{statusEl.textContent="Armazenamento ocupado por outra aba. Feche outras abas do aplicativo.";};
+  });
+}
+function operacaoDB(metodo,registro){
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NOME,"readwrite"), store=tx.objectStore(STORE_NOME);
+    const req=metodo==="getAll"?store.getAll():store[metodo](registro);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+    tx.onabort=()=>reject(tx.error);
+  });
+}
+const adicionarRegistro=r=>operacaoDB("add",r);
+const buscarRegistros=()=>operacaoDB("getAll");
+const atualizarRegistro=r=>operacaoDB("put",r);
+
+async function migrarRegistrosAntigos(){
+  let antigos=[];
+  try{antigos=JSON.parse(localStorage.getItem(CHAVE_ANTIGA)||"[]");}catch(e){console.warn(e);}
+  if(!antigos.length)return;
+  const atuais=await buscarRegistros();
+  for(const antigo of antigos){
+    if(atuais.some(r=>String(r.id)===String(antigo.id)))continue;
+    let foto=antigo.foto;
+    if(typeof foto==="string"&&foto.includes(",")){
+      const partes=foto.split(","), mime=partes[0].match(/:(.*?);/), tipo=mime?mime[1]:"image/jpeg";
+      const bytes=atob(partes[1]), array=new Uint8Array(bytes.length);
+      for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);
+      foto=new Blob([array],{type:tipo});
+    }
+    await adicionarRegistro({
+      id:String(antigo.id),latitude:antigo.latitude,longitude:antigo.longitude,
+      precisao:antigo.precisao,data:antigo.data,foto:foto instanceof Blob?foto:null,
+      fotos:foto instanceof Blob?[foto]:[],responsavel:"",problema:"",descricao:"",
+      trecho:"",solucao:"",acao:"",codigo:String(antigo.id),
+      enviado:antigo.enviado===true,tentativas:0
+    });
+  }
+  localStorage.removeItem(CHAVE_ANTIGA);
+}
+
+function atualizarConexao(){
+  const el=$("conexao");
+  if(navigator.onLine){el.textContent="🟢 INTERNET CONECTADA";el.className="conexao";}
+  else{el.textContent="🟠 SEM INTERNET — MODO OFFLINE ATIVO";el.className="conexao offline";}
+}
+window.addEventListener("online",()=>{atualizarConexao();statusEl.textContent="Internet restaurada! Verificando registros pendentes...";atualizarFila();setTimeout(sincronizar,2500);});
+window.addEventListener("offline",()=>{atualizarConexao();statusEl.textContent="Sem internet. Você pode continuar registrando normalmente.";});
+
+function capturarGPS(){
+  statusEl.textContent="📍 Solicitando localização...";
+  if(!navigator.geolocation){statusEl.textContent="Navegador sem suporte a GPS.";alert("Este navegador não suporta localização.");return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    gps={latitude:pos.coords.latitude,longitude:pos.coords.longitude,precisao:pos.coords.accuracy,data:new Date().toISOString()};
+    $("coordenadas").textContent=`Latitude: ${gps.latitude} | Longitude: ${gps.longitude} | Precisão: ${gps.precisao.toFixed(1)} m`;
+    statusEl.textContent="✅ Localização capturada com sucesso!";
+  },erro=>{
+    const msg=erro.code===1?"Permita o acesso à localização nas configurações do navegador.":erro.code===2?"GPS indisponível. Verifique o sinal.":"Tempo esgotado. Tente novamente em local aberto.";
+    statusEl.textContent=msg;alert(msg);
+  },{enableHighAccuracy:true,timeout:20000,maximumAge:60000});
+}
+$("btnGps").addEventListener("click",capturarGPS);
+$("btnFoto").addEventListener("click",()=>$("foto").click());
+
+function comprimirImagem(file){
+  return new Promise((resolve,reject)=>{
+    if(!file.type.startsWith("image/")){reject(new Error("Arquivo não é uma imagem."));return;}
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let w=img.width,h=img.height,escala=Math.min(1,MAX_DIMENSAO/Math.max(w,h));
+      w=Math.round(w*escala);h=Math.round(h*escala);
+      const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{URL.revokeObjectURL(url);blob?resolve(blob):reject(new Error("Não foi possível processar a foto."));},"image/jpeg",QUALIDADE_JPEG);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Falha ao abrir imagem."));};
+    img.src=url;
+  });
+}
+$("foto").addEventListener("change",async e=>{
+  const arquivos=Array.from(e.target.files||[]);e.target.value="";
+  if(!arquivos.length)return;
+  const vagas=MAX_FOTOS-fotosSelecionadas.length;
+  if(vagas<=0){alert("Você já selecionou 5 fotos.");return;}
+  if(arquivos.length>vagas)alert(`Só serão adicionadas ${vagas} foto(s), para respeitar o limite de 5.`);
+  statusEl.textContent="📸 Preparando e compactando fotos...";
+  try{
+    for(const arquivo of arquivos.slice(0,vagas))fotosSelecionadas.push({blob:await comprimirImagem(arquivo),nome:arquivo.name});
+    renderizarFotos();statusEl.textContent="Fotos adicionadas. Lembre-se de salvar o registro.";
+  }catch(err){console.error(err);alert("Não foi possível processar uma das imagens.");}
+});
+function renderizarFotos(){
+  const preview=$("preview");preview.innerHTML="";
+  fotosSelecionadas.forEach((item,index)=>{
+    const url=URL.createObjectURL(item.blob),div=document.createElement("div");div.className="photo-item";
+    const img=document.createElement("img");img.src=url;img.alt=`Foto ${index+1}`;
+    const info=document.createElement("div");info.className="hint";info.textContent=`Foto ${index+1} · ${(item.blob.size/1024).toFixed(0)} KB`;
+    const btn=document.createElement("button");btn.type="button";btn.textContent="Remover foto";
+    btn.onclick=()=>{URL.revokeObjectURL(url);fotosSelecionadas.splice(index,1);renderizarFotos();};
+    div.append(img,info,btn);preview.appendChild(div);
+  });
+  $("contadorFotos").textContent=`${fotosSelecionadas.length} de ${MAX_FOTOS} fotos selecionadas`;
+}
+$("problema").addEventListener("change",()=>{
+  const vis=$("problema").value==="Outro";$("problemaOutroBox").hidden=!vis;$("problemaOutro").required=vis;
+});
+$("trecho").addEventListener("change",()=>{
+  const vis=$("trecho").value==="Outro";$("trechoOutroBox").hidden=!vis;$("trechoOutro").required=vis;
+});
+document.querySelectorAll('input[name="solucao"]').forEach(r=>r.addEventListener("change",()=>{
+  const nao=document.querySelector('input[name="solucao"]:checked')?.value==="NÃO";
+  $("acaoBox").hidden=!nao;$("acao").required=nao;
+}));
+function gerarCodigo(){
+  const d=new Date(),pad=n=>String(n).padStart(2,"0");
+  return "VIA-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
+}
+function obterProblema(){const v=$("problema").value;return v==="Outro"?`Outro: ${$("problemaOutro").value.trim()}`:v;}
+function obterTrecho(){const v=$("trecho").value;return v==="Outro"?`Outro: ${$("trechoOutro").value.trim()}`:v;}
+
+$("formRegistro").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!db){alert("Aguarde a inicialização do aplicativo.");return;}
+  if(!gps){alert("Capture a localização GPS antes de salvar.");return;}
+  if(!fotosSelecionadas.length){alert("Adicione pelo menos uma foto do local.");return;}
+  const solucao=document.querySelector('input[name="solucao"]:checked')?.value||"";
+  if(!solucao){alert("Informe se o problema foi solucionado.");return;}
+  if(solucao==="NÃO"&&!$("acao").value.trim()){alert("Informe a ação necessária para solucionar o problema.");return;}
+  const btn=$("btnSalvar");btn.disabled=true;statusEl.textContent="💾 Salvando registro no celular...";
+  try{
+    const codigo=gerarCodigo(),registro={
+      id:crypto.randomUUID(),codigo,responsavel:$("responsavel").value.trim(),data:$("data").value,
+      problema:obterProblema(),descricao:$("descricao").value.trim(),trecho:obterTrecho(),
+      latitude:gps.latitude,longitude:gps.longitude,precisao:gps.precisao,gpsData:gps.data,
+      fotos:fotosSelecionadas.map(f=>f.blob),foto:fotosSelecionadas[0]?.blob||null,
+      solucao,acao:solucao==="NÃO"?$("acao").value.trim():"",
+      enviado:false,tentativas:0,criadoEm:new Date().toISOString()
+    };
+    await adicionarRegistro(registro);
+    statusEl.textContent=`✅ Registro salvo no aparelho! Código: ${codigo}`;
+    $("formRegistro").reset();$("data").value=hojeLocal();
+    $("problemaOutroBox").hidden=true;$("trechoOutroBox").hidden=true;$("acaoBox").hidden=true;
+    $("problemaOutro").required=false;$("trechoOutro").required=false;$("acao").required=false;
+    gps=null;fotosSelecionadas=[];$("coordenadas").textContent="Localização ainda não capturada.";renderizarFotos();
+    await atualizarFila();if(navigator.onLine)setTimeout(sincronizar,1200);
+  }catch(err){console.error(err);statusEl.textContent="❌ Erro ao salvar. Verifique o espaço disponível.";alert("Não foi possível salvar o registro no aparelho.");}
+  finally{btn.disabled=false;}
+});
+
+async function atualizarFila(){
+  if(!db)return;
+  try{
+    const registros=await buscarRegistros(),pendentes=registros.filter(r=>!r.enviado).length,enviados=registros.filter(r=>r.enviado).length;
+    const el=$("fila");el.textContent=`📦 Total: ${registros.length} | ⏳ Pendentes: ${pendentes} | ✅ Enviados: ${enviados}`;
+    el.className=pendentes>0?"status pendentes":"status sucesso";
+  }catch(err){console.error("Erro ao consultar fila:",err);}
+}
+function converterFotoBase64(foto){
+  return new Promise((resolve,reject)=>{
+    if(typeof foto==="string"){resolve(foto.includes(",")?foto.split(",")[1]:foto);return;}
+    const leitor=new FileReader();leitor.onload=()=>resolve(String(leitor.result).split(",")[1]);leitor.onerror=()=>reject(leitor.error);leitor.readAsDataURL(foto);
+  });
+}
+
+/*
+ * Envio por formulário oculto + iframe. Essa técnica permite receber a resposta
+ * do Apps Script entre domínios sem depender de CORS do fetch.
+ * O Código.gs precisa ter o doPost com suporte a ?bridge=1 (passo seguinte).
+ */
+function enviarParaGoogle(registro){
+  return new Promise((resolve,reject)=>{
+    const frame=document.createElement("iframe"),form=document.createElement("form"),payload=document.createElement("textarea");
+    const nome="registroViasFrame_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+    frame.name=nome;frame.style.display="none";frame.setAttribute("aria-hidden","true");
+    form.method="POST";form.action=URL_APPS_SCRIPT+"?bridge=1";form.target=nome;form.style.display="none";
+    payload.name="payload";payload.value=JSON.stringify(registro);form.appendChild(payload);
+    let finalizado=false;
+    const limpar=()=>{window.removeEventListener("message",receber);form.remove();frame.remove();clearTimeout(timer);};
+    const receber=event=>{
+      if(event.source!==frame.contentWindow||!event.data||event.data.type!=="REGISTRO_VIAS_RESULT")return;
+      finalizado=true;limpar();resolve(event.data.payload);
+    };
+    window.addEventListener("message",receber);
+    document.body.append(frame,form);
+    const timer=setTimeout(()=>{if(!finalizado){limpar();reject(new Error("Tempo esgotado aguardando resposta do Google Apps Script."));}},90000);
+    form.submit();
+  });
+}
+
+async function sincronizar(){
+  if(sincronizando)return;
+  if(!navigator.onLine){statusEl.textContent="Sem internet. Os registros continuam salvos no aparelho.";return;}
+  if(!db){statusEl.textContent="Banco de dados ainda não está pronto.";return;}
+  sincronizando=true;const botao=$("btnSync");botao.disabled=true;
+  try{
+    const registros=await buscarRegistros(),pendentes=registros.filter(r=>!r.enviado);
+    if(!pendentes.length){statusEl.textContent="Todos os registros estão sincronizados.";return;}
+    let enviados=0,falhas=0;
+    for(let i=0;i<pendentes.length;i++){
+      if(!navigator.onLine){falhas+=pendentes.length-i;break;}
+      const registro=pendentes[i];statusEl.textContent=`🌐 Enviando registro ${i+1} de ${pendentes.length}...`;
+      try{
+        let fotos=Array.isArray(registro.fotos)&&registro.fotos.length?registro.fotos:(registro.foto?[registro.foto]:[]);
+        const fotosBase64=[];for(const foto of fotos)fotosBase64.push(await converterFotoBase64(foto));
+        const dadosEnvio={
+          id:registro.id,codigo:registro.codigo||registro.id,responsavel:registro.responsavel||"",
+          data:registro.data||"",problema:registro.problema||"",descricao:registro.descricao||"",
+          trecho:registro.trecho||"",latitude:registro.latitude,longitude:registro.longitude,
+          precisao:registro.precisao,fotos:fotosBase64,foto:fotosBase64[0]||"",
+          solucao:registro.solucao||"",acao:registro.acao||""
+        };
+        const resposta=await enviarParaGoogle(dadosEnvio);
+        if(resposta&&resposta.sucesso){
+          registro.enviado=true;registro.dataEnvio=new Date().toISOString();await atualizarRegistro(registro);enviados++;
+        }else{falhas++;console.error("Resposta do servidor:",resposta);}
+      }catch(err){console.error("Falha no registro "+registro.id,err);falhas++;}
+      await atualizarFila();
+    }
+    statusEl.textContent=`🏁 Sincronização finalizada! Enviados: ${enviados} | Pendentes: ${falhas}`;
+    if(falhas===0)alert("✅ Todos os registros foram sincronizados!");
+    else alert(`Sincronização concluída.\n\nEnviados: ${enviados}\nPendentes: ${falhas}\n\nOs registros continuam salvos no aparelho.`);
+  }catch(err){console.error(err);statusEl.textContent="Erro durante a sincronização.";}
+  finally{sincronizando=false;botao.disabled=false;await atualizarFila();}
+}
+$("btnSync").addEventListener("click",sincronizar);
+
+async function inicializar(){
+  atualizarConexao();statusEl.textContent="Abrindo armazenamento offline...";
+  try{
+    await iniciarBanco();statusEl.textContent="Migrando registros anteriores...";
+    await migrarRegistrosAntigos();await atualizarFila();
+    statusEl.textContent="✅ Aplicativo pronto para uso.";
+    if(navigator.onLine)setTimeout(sincronizar,2000);
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Service Worker não registrado:",err));
+    }
+  }catch(err){console.error(err);statusEl.textContent="Erro ao inicializar armazenamento offline.";alert("Não foi possível inicializar o banco local. Recarregue o aplicativo.");}
+}
+inicializar();
+</script>
+</body>
+</html>
