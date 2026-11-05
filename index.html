@@ -362,6 +362,7 @@ function enviarParaGoogle(registro){
     };
 
     const receber=event=>{
+      console.log("MENSAGEM RECEBIDA:", event.data);
 
       if(!event.data ||
          event.data.type!=="REGISTRO_VIAS_RESULT") return;
